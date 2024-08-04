@@ -1,5 +1,3 @@
-# Expanded Chess Game in Python
-
 class ChessPiece:
     def __init__(self, color):
         self.color = color
@@ -21,6 +19,18 @@ class Pawn(ChessPiece):
         if abs(start[0] - end[0]) == 1 and end[1] - start[1] == direction:
             return board[end[0]][end[1]] is not None and board[end[0]][end[1]].color != self.color
         return False
+
+    def promote(self, position, board):
+        if (self.color == 'white' and position[1] == 7) or (self.color == 'black' and position[1] == 0):
+            new_piece = input("Promote to (Q, R, B, N): ").upper()
+            if new_piece == 'Q':
+                board[position[0]][position[1]] = Queen(self.color)
+            elif new_piece == 'R':
+                board[position[0]][position[1]] = Rook(self.color)
+            elif new_piece == 'B':
+                board[position[0]][position[1]] = Bishop(self.color)
+            elif new_piece == 'N':
+                board[position[0]][position[1]] = Knight(self.color)
 
 class Rook(ChessPiece):
     def valid_move(self, start, end, board):
@@ -61,13 +71,27 @@ class Queen(ChessPiece):
         return Rook(self.color).valid_move(start, end, board) or Bishop(self.color).valid_move(start, end, board)
 
 class King(ChessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.has_moved = False
+
     def valid_move(self, start, end, board):
-        return max(abs(start[0] - end[0]), abs(start[1] - end[1])) == 1
+        if max(abs(start[0] - end[0]), abs(start[1] - end[1])) == 1:
+            return True
+        # Castling logic
+        if not self.has_moved and abs(start[0] - end[0]) == 2 and start[1] == end[1]:
+            rook_pos = (0 if end[0] == 2 else 7, start[1])
+            rook = board[rook_pos[0]][rook_pos[1]]
+            if isinstance(rook, Rook) and not rook.has_moved:
+                if all(board[i][start[1]] is None for i in range(min(start[0], end[0])+1, max(start[0], end[0]))):
+                    return True
+        return False
 
 class Board:
     def __init__(self):
         self.board = self.create_board()
         self.current_turn = 'white'
+        self.kings = {'white': (4, 0), 'black': (4, 7)}
 
     def create_board(self):
         board = [[None for _ in range(8)] for _ in range(8)]
@@ -98,11 +122,26 @@ class Board:
             if piece.valid_move(start, end, self.board):
                 self.board[end[0]][end[1]] = piece
                 self.board[start[0]][start[1]] = None
+                if isinstance(piece, Pawn):
+                    piece.promote(end, self.board)
                 self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+                if isinstance(piece, King):
+                    piece.has_moved = True
+                    self.kings[piece.color] = end
+                if isinstance(piece, Rook):
+                    piece.has_moved = True
             else:
                 print("Invalid move!")
         else:
             print("No piece at start position or not your turn!")
+
+    def in_check(self, color):
+        king_pos = self.kings[color]
+        for row in self.board:
+            for piece in row:
+                if piece and piece.color != color and piece.valid_move((piece.x, piece.y), king_pos, self.board):
+                    return True
+        return False
 
 def main():
     board = Board()
