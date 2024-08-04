@@ -184,21 +184,106 @@ class Board:
                                 self.board[x][y] = piece
                                 self.board[i][j] = original_end_piece
         return True
+        
+def print_board(self):
+        for row in self.board:
+            print(' '.join(str(piece) if piece else '.' for piece in row))
+        print()
+
+    def move_piece(self, start, end):
+        piece = self.board[start[0]][start[1]]
+        if piece and piece.color == self.current_turn:
+            if piece.valid_move(start, end, self.board):
+                # En passant capture
+                if isinstance(piece, Pawn) and abs(start[0] - end[0]) == 1 and self.board[end[0]][end[1]] is None:
+                    self.board[end[0]][start[1]] = None
+                
+                original_end_piece = self.board[end[0]][end[1]]
+                self.board[end[0]][end[1]] = piece
+                self.board[start[0]][start[1]] = None
+
+                if self.in_check(self.current_turn):
+                    self.board[start[0]][start[1]] = piece
+                    self.board[end[0]][end[1]] = original_end_piece
+                    print("Move leaves king in check!")
+                    return
+
+                if isinstance(piece, Pawn):
+                    piece.promote(end, self.board)
+                    piece.has_moved = True
+
+                if isinstance(piece, King):
+                    piece.has_moved = True
+                    self.kings[piece.color] = end
+
+                if isinstance(piece, Rook):
+                    piece.has_moved = True
+
+                self.last_move = (start, end)
+                self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+                
+                if self.in_check(self.current_turn):
+                    print(f"{self.current_turn.capitalize()} is in check!")
+                if self.in_checkmate(self.current_turn):
+                    print(f"{self.current_turn.capitalize()} is in checkmate! Game over.")
+                    exit()
+            else:
+                print("Invalid move!")
+        else:
+            print("No piece at start position or not your turn!")
+
+    def in_check(self, color):
+        king_pos = self.kings[color]
+        for row in self.board:
+            for piece in row:
+                if piece and piece.color != color and piece.valid_move((piece.x, piece.y), king_pos, self.board):
+                    return True
+        return False
+
+    def in_checkmate(self, color):
+        if not self.in_check(color):
+            return False
+        for x in range(8):
+            for y in range(8):
+                piece = self.board[x][y]
+                if piece and piece.color == color:
+                    for i in range(8):
+                        for j in range(8):
+                            if piece.valid_move((x, y), (i, j), self.board):
+                                original_end_piece = self.board[i][j]
+                                self.board[i][j] = piece
+                                self.board[x][y] = None
+                                if not self.in_check(color):
+                                    self.board[x][y] = piece
+                                    self.board[i][j] = original_end_piece
+                                    return False
+                                self.board[x][y] = piece
+                                self.board[i][j] = original_end_piece
+        return True
+
+def offer_draw():
+    response = input("Do you agree to a draw? (yes/no): ").lower()
+    return response == 'yes'
 
 def main():
     board = Board()
     board.print_board()
     
     while True:
-        move = input(f"{board.current_turn.capitalize()}'s turn. Enter move (e.g., 'a2 a3'): ")
-        try:
-            start_pos, end_pos = move.split()
-            start = (8 - int(start_pos[1]), ord(start_pos[0]) - ord('a'))
-            end = (8 - int(end_pos[1]), ord(end_pos[0]) - ord('a'))
-            board.move_piece(start, end)
-            board.print_board()
-        except Exception as e:
-            print(f"Error: {e}")
+        move = input(f"{board.current_turn.capitalize()}'s turn. Enter move (e.g., 'a2 a3') or type 'draw' to offer a draw: ")
+        if move.lower() == 'draw':
+            if offer_draw():
+                print("Draw agreed. Game over.")
+                break
+        else:
+            try:
+                start_pos, end_pos = move.split()
+                start = (8 - int(start_pos[1]), ord(start_pos[0]) - ord('a'))
+                end = (8 - int(end_pos[1]), ord(end_pos[0]) - ord('a'))
+                board.move_piece(start, end)
+                board.print_board()
+            except Exception as e:
+                print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
