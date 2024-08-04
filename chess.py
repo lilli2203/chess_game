@@ -3,19 +3,21 @@ class ChessPiece:
         self.color = color
 
     def __str__(self):
-        return self.__class__.__name__[0]  # Return the first letter of the class name
+        return self.__class__.__name__[0]  
 
     def valid_move(self, start, end, board):
         raise NotImplementedError("This method should be overridden by subclasses")
 
 class Pawn(ChessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.has_moved = False
+
     def valid_move(self, start, end, board):
         direction = 1 if self.color == 'white' else -1
-        # Basic pawn move logic
         if start[0] == end[0] and (end[1] - start[1] == direction or
-            (start[1] in [1, 6] and end[1] - start[1] == 2 * direction)):
+            (start[1] in [1, 6] and end[1] - start[1] == 2 * direction and not self.has_moved)):
             return board[end[0]][end[1]] is None
-        # Pawn capture logic
         if abs(start[0] - end[0]) == 1 and end[1] - start[1] == direction:
             return board[end[0]][end[1]] is not None and board[end[0]][end[1]].color != self.color
         return False
@@ -33,6 +35,10 @@ class Pawn(ChessPiece):
                 board[position[0]][position[1]] = Knight(self.color)
 
 class Rook(ChessPiece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.has_moved = False
+
     def valid_move(self, start, end, board):
         if start[0] != end[0] and start[1] != end[1]:
             return False
@@ -78,7 +84,6 @@ class King(ChessPiece):
     def valid_move(self, start, end, board):
         if max(abs(start[0] - end[0]), abs(start[1] - end[1])) == 1:
             return True
-        # Castling logic
         if not self.has_moved and abs(start[0] - end[0]) == 2 and start[1] == end[1]:
             rook_pos = (0 if end[0] == 2 else 7, start[1])
             rook = board[rook_pos[0]][rook_pos[1]]
@@ -86,6 +91,16 @@ class King(ChessPiece):
                 if all(board[i][start[1]] is None for i in range(min(start[0], end[0])+1, max(start[0], end[0]))):
                     return True
         return False
+        
+         def valid_move(self, start, end, board):
+        direction = 1 if self.color == 'white' else -1
+        if start[0] == end[0] and (end[1] - start[1] == direction or
+            (start[1] in [1, 6] and end[1] - start[1] == 2 * direction and not self.has_moved)):
+            return board[end[0]][end[1]] is None
+        if abs(start[0] - end[0]) == 1 and end[1] - start[1] == direction:
+            return board[end[0]][end[1]] is not None and board[end[0]][end[1]].color != self.color
+        return False
+
 
 class Board:
     def __init__(self):
@@ -124,12 +139,18 @@ class Board:
                 self.board[start[0]][start[1]] = None
                 if isinstance(piece, Pawn):
                     piece.promote(end, self.board)
+                    piece.has_moved = True
                 self.current_turn = 'black' if self.current_turn == 'white' else 'white'
                 if isinstance(piece, King):
                     piece.has_moved = True
                     self.kings[piece.color] = end
                 if isinstance(piece, Rook):
                     piece.has_moved = True
+                if self.in_check(self.current_turn):
+                    print(f"{self.current_turn.capitalize()} is in check!")
+                if self.in_checkmate(self.current_turn):
+                    print(f"{self.current_turn.capitalize()} is in checkmate! Game over.")
+                    exit()
             else:
                 print("Invalid move!")
         else:
@@ -142,6 +163,27 @@ class Board:
                 if piece and piece.color != color and piece.valid_move((piece.x, piece.y), king_pos, self.board):
                     return True
         return False
+
+    def in_checkmate(self, color):
+        if not self.in_check(color):
+            return False
+        for x in range(8):
+            for y in range(8):
+                piece = self.board[x][y]
+                if piece and piece.color == color:
+                    for i in range(8):
+                        for j in range(8):
+                            if piece.valid_move((x, y), (i, j), self.board):
+                                original_end_piece = self.board[i][j]
+                                self.board[i][j] = piece
+                                self.board[x][y] = None
+                                if not self.in_check(color):
+                                    self.board[x][y] = piece
+                                    self.board[i][j] = original_end_piece
+                                    return False
+                                self.board[x][y] = piece
+                                self.board[i][j] = original_end_piece
+        return True
 
 def main():
     board = Board()
