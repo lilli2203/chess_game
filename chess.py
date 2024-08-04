@@ -91,22 +91,14 @@ class King(ChessPiece):
                 if all(board[i][start[1]] is None for i in range(min(start[0], end[0])+1, max(start[0], end[0]))):
                     return True
         return False
-        
-         def valid_move(self, start, end, board):
-        direction = 1 if self.color == 'white' else -1
-        if start[0] == end[0] and (end[1] - start[1] == direction or
-            (start[1] in [1, 6] and end[1] - start[1] == 2 * direction and not self.has_moved)):
-            return board[end[0]][end[1]] is None
-        if abs(start[0] - end[0]) == 1 and end[1] - start[1] == direction:
-            return board[end[0]][end[1]] is not None and board[end[0]][end[1]].color != self.color
-        return False
-
 
 class Board:
     def __init__(self):
         self.board = self.create_board()
         self.current_turn = 'white'
         self.kings = {'white': (4, 0), 'black': (4, 7)}
+        self.last_move = None
+        self.move_history = []
 
     def create_board(self):
         board = [[None for _ in range(8)] for _ in range(8)]
@@ -127,65 +119,6 @@ class Board:
         return board
 
     def print_board(self):
-        for row in self.board:
-            print(' '.join(str(piece) if piece else '.' for piece in row))
-        print()
-
-    def move_piece(self, start, end):
-        piece = self.board[start[0]][start[1]]
-        if piece and piece.color == self.current_turn:
-            if piece.valid_move(start, end, self.board):
-                self.board[end[0]][end[1]] = piece
-                self.board[start[0]][start[1]] = None
-                if isinstance(piece, Pawn):
-                    piece.promote(end, self.board)
-                    piece.has_moved = True
-                self.current_turn = 'black' if self.current_turn == 'white' else 'white'
-                if isinstance(piece, King):
-                    piece.has_moved = True
-                    self.kings[piece.color] = end
-                if isinstance(piece, Rook):
-                    piece.has_moved = True
-                if self.in_check(self.current_turn):
-                    print(f"{self.current_turn.capitalize()} is in check!")
-                if self.in_checkmate(self.current_turn):
-                    print(f"{self.current_turn.capitalize()} is in checkmate! Game over.")
-                    exit()
-            else:
-                print("Invalid move!")
-        else:
-            print("No piece at start position or not your turn!")
-
-    def in_check(self, color):
-        king_pos = self.kings[color]
-        for row in self.board:
-            for piece in row:
-                if piece and piece.color != color and piece.valid_move((piece.x, piece.y), king_pos, self.board):
-                    return True
-        return False
-
-    def in_checkmate(self, color):
-        if not self.in_check(color):
-            return False
-        for x in range(8):
-            for y in range(8):
-                piece = self.board[x][y]
-                if piece and piece.color == color:
-                    for i in range(8):
-                        for j in range(8):
-                            if piece.valid_move((x, y), (i, j), self.board):
-                                original_end_piece = self.board[i][j]
-                                self.board[i][j] = piece
-                                self.board[x][y] = None
-                                if not self.in_check(color):
-                                    self.board[x][y] = piece
-                                    self.board[i][j] = original_end_piece
-                                    return False
-                                self.board[x][y] = piece
-                                self.board[i][j] = original_end_piece
-        return True
-        
-def print_board(self):
         for row in self.board:
             print(' '.join(str(piece) if piece else '.' for piece in row))
         print()
@@ -219,6 +152,7 @@ def print_board(self):
                 if isinstance(piece, Rook):
                     piece.has_moved = True
 
+                self.move_history.append((start, end))
                 self.last_move = (start, end)
                 self.current_turn = 'black' if self.current_turn == 'white' else 'white'
                 
@@ -227,6 +161,9 @@ def print_board(self):
                 if self.in_checkmate(self.current_turn):
                     print(f"{self.current_turn.capitalize()} is in checkmate! Game over.")
                     exit()
+                if self.is_stalemate(self.current_turn):
+                    print("Stalemate! Game over.")
+                    exit()
             else:
                 print("Invalid move!")
         else:
@@ -234,14 +171,36 @@ def print_board(self):
 
     def in_check(self, color):
         king_pos = self.kings[color]
-        for row in self.board:
-            for piece in row:
-                if piece and piece.color != color and piece.valid_move((piece.x, piece.y), king_pos, self.board):
+        for x in range(8):
+            for y in range(8):
+                piece = self.board[x][y]
+                if piece and piece.color != color and piece.valid_move((x, y), king_pos, self.board):
                     return True
         return False
 
     def in_checkmate(self, color):
         if not self.in_check(color):
+            return False
+        for x in range(8):
+            for y in range(8):
+                piece = self.board[x][y]
+                if piece and piece.color == color:
+                    for i in range(8):
+                        for j in range(8):
+                            if piece.valid_move((x, y), (i, j), self.board):
+                                original_end_piece = self.board[i][j]
+                                self.board[i][j] = piece
+                                self.board[x][y] = None
+                                if not self.in_check(color):
+                                    self.board[x][y] = piece
+                                    self.board[i][j] = original_end_piece
+                                    return False
+                                self.board[x][y] = piece
+                                self.board[i][j] = original_end_piece
+        return True
+
+    def is_stalemate(self, color):
+        if self.in_check(color):
             return False
         for x in range(8):
             for y in range(8):
